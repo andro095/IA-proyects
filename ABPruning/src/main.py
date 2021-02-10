@@ -1,4 +1,5 @@
 import math
+import time
 
 class Halma:
     def __init__(self):
@@ -71,12 +72,12 @@ class Halma:
 
         return None
 
-    def generate_childs(self):
+    def generate_childs(self, turn):
         generated_childs = []
         visitated_pos = []
         for y in range(10):
             for x in range(10):
-                if self.tbstate[y][x] == self.pturn:
+                if self.tbstate[y][x] == turn:
                     for w in range(y - 1, y + 2):
                         for z in range(x - 1, x + 2):
                             if not (y == w and x == z):
@@ -114,88 +115,126 @@ class Halma:
         reg_val = 0
         for y in range(cy - 1, cy + 2):
             for x in range(cx - 1, cx + 2):
-                if self.tbstate[y][x]!= ".":
-                    if self.is_valid_hope(2*cy-y, 2*cx-x, y, x):
-                        reg_val += 1 if self.tbstate[cy][cx] == self.tbstate[y][x] else -1
+                if self.is_valid_cord(y, x):
+                    if self.tbstate[y][x] != ".":
+                        if self.is_valid_hope(2*cy-y, 2*cx-x, y, x):
+                            reg_val += 1 if self.tbstate[cy][cx] == self.tbstate[y][x] else -1
 
         return goal_val * 0.25 + op_val * 0.35 + reg_val * 0.40
 
 
     def min(self, node, depth, alpha, beta):
         if depth == 3:
-            return self.gen_value(node[0], node[1][0], node[1][1]), node[1][0], node[1][1]
+            return self.gen_value(node[0], node[1][0], node[1][1]), node[1][0], node[1][1], node[0][0], node[0][1]
 
         minv = 1000
+        ox = None
+        oy = None
         px = None
         py = None
 
-        generated_childs = self.generate_childs()
+        generated_childs = self.generate_childs("BK")
 
         for childnode in generated_childs:
             self.tbstate[childnode[1][1]][childnode[1][0]] = "BK"
             self.tbstate[childnode[0][1]][childnode[0][0]] = "."
 
-            mval, max_y, max_x = self.max(childnode, depth + 1, alpha, beta)
+            mval, max_y, max_x, o_y, o_x = self.max(childnode, depth + 1, alpha, beta)
 
             if mval < minv:
                 minv = mval
-                py = childnode[1][1]
-                px = childnode[1][0]
+                py = childnode[1][0]
+                px = childnode[1][1]
+                oy = childnode[0][0]
+                ox = childnode[0][1]
 
             self.tbstate[childnode[1][1]][childnode[1][0]] = "."
             self.tbstate[childnode[0][1]][childnode[0][0]] = "BK"
 
             if minv <= alpha:
-                return minv, py, px
+                return minv, py, px, oy, ox
 
             if minv < beta:
                 beta = minv
 
-        return minv, py, px
+        return minv, py, px, oy, ox
 
 
     def max(self, node, depth, alpha, beta):
         if depth == 3:
-            return self.gen_value(node[0], node[1][0], node[1][1]), node[1][0], node[1][1]
+            return self.gen_value(node[0], node[1][0], node[1][1]), node[1][0], node[1][1], node[0][0], node[0][1]
 
         maxv = -1000
+
+        ox = None
+        oy = None
         px = None
         py = None
 
-        generated_childs = self.generate_childs()
+        generated_childs = self.generate_childs("WH")
 
         for childnode in generated_childs:
             self.tbstate[childnode[1][1]][childnode[1][0]] = "WH"
             self.tbstate[childnode[0][1]][childnode[0][0]] = "."
 
-            mval, min_y, min_x = self.max(childnode, depth + 1, alpha, beta)
+            mval, min_y, min_x, o_y, o_x = self.min(childnode, depth + 1, alpha, beta)
 
             if mval > maxv:
                 maxv = mval
-                py = childnode[1][1]
-                px = childnode[1][0]
+                py = childnode[1][0]
+                px = childnode[1][1]
+                oy = childnode[0][0]
+                ox = childnode[0][1]
 
             self.tbstate[childnode[1][1]][childnode[1][0]] = "."
             self.tbstate[childnode[0][1]][childnode[0][0]] = "WH"
 
             if maxv >= beta:
-                return maxv, py, px
+                return maxv, py, px, oy, ox
 
             if maxv > alpha:
                 alpha = maxv
 
-        return maxv, py, px
+        return maxv, py, px, oy, ox
 
     def play(self):
-        pass
+        while True:
+            self.draw_halma_board()
+            isBlackWinner = self.is_winner()
+            isWhiteWinner = self.is_winner(isBlack=False)
+            if isBlackWinner is not None or isWhiteWinner is not None:
+                if isBlackWinner == "BK": print("Jugador Humano ha ganado")
+                if isWhiteWinner == "WH": print("La computadora ha ganado")
+                exit(3)
 
+            if self.pturn == "BK":
+                while True:
+                    time_start = time.time()
+                    mval, py, px, oy, ox = self.min([], 0, -1000, 1000)
+                    time_end = time.time()
+                    print("Resultado obtenido en {}s".format(round(time_end-time_start, 3)))
+                    print("Movimiento Recomendado: De x = {} y = {} a x = {} y = {} ".format(ox + 1, oy + 1, px + 1, py + 1))
+                    try:
+                        iox = int(input("Ingresa la coordenada x de la ficha a mover: "))
+                        ioy = int(input("Ingresa la coordenada y de la ficha a mover: "))
+                        idx = int(input("Ingresa la coordenada x destino: "))
+                        idy = int(input("Ingresa la coordenada y destino: "))
+                        if self.is_valid_cord(ioy - 1, iox - 1) and self.is_valid_cord(idy - 1, idx - 1):
+                            self.tbstate[ioy - 1][iox - 1] = "."
+                            self.tbstate[idy - 1][idx - 1] = "BK"
+                            self.pturn = "WH"
+                            break
+                        else:
+                            print("Coordenadas no válidas. Ingresa de nuevo")
+                    except Exception:
+                        print("Coordenadas no válidas. Ingresa de nuevo")
+            else:
+                ml, cy, cx, oy, ox = self.max([], 0, -1000, 1000)
+                self.tbstate[oy][ox] = "."
+                self.tbstate[cy][cx] = "WH"
+                self.pturn = "BK"
 
 
 if __name__ == '__main__':
     halmaGame = Halma()
-    halmaGame.draw_halma_board()
-    num = halmaGame.generate_childs()
-    print("Numero de Hijos: {}".format(len(num)))
-    print("Hijos:\n",num)
-    print(halmaGame.gen_value([3, 1], 4, 4))
-    # print(halmaGame.is_winner())
+    halmaGame.play()
